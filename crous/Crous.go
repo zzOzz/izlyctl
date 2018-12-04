@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"bytes"
 	"encoding/json"
+	"time"
 )
 //[
 //{
@@ -205,21 +206,27 @@ func (c *Client) PostResource(resource string, data interface{}, authenticated b
 	return body, header, err
 }
 
-func (c *Client) PatchResource(resource string, data interface{}, authenticated bool) ([]byte, http.Header, error) {
+func (c *Client) PutResource(resource string, data interface{}, authenticated bool) ([]byte, http.Header, error) {
 	var url string
 	url = fmt.Sprintf("%s%s", strings.TrimRight(c.config.Api.Url, "/"), resource)
-	logrus.Debugf(">>> PATCH  %q", url)
+	logrus.Debugf(">>> PUT  %q", url)
 
-	payload := new(bytes.Buffer)
-	encoder := json.NewEncoder(payload)
-	if err := encoder.Encode(data); err != nil {
+	//payload := new(bytes.Buffer)
+	//encoder := json.NewEncoder(payload)
+	//if err := encoder.Encode(data); err != nil {
+	//	return nil, nil, err
+	//}
+	payload, err := json.Marshal(data)
+	if err != nil {
 		return nil, nil, err
+		fmt.Println("error:", err)
 	}
 
-	payloadString := strings.TrimSpace(fmt.Sprintf("%s", payload))
-	logrus.Debugf(">>> PATCH %s payload=%s", url, payloadString)
+	//payloadString := strings.TrimSpace(fmt.Sprintf("%s", payload))
+	logrus.Debugf(">>> PUT %s payload=%s", url, string(payload))
 
-	req, err := http.NewRequest("PATCH", url, payload)
+	req, err := http.NewRequest("PUT", url, strings.NewReader(string(payload)))
+	//req, err := http.NewRequest("PUT", url, payload)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -266,6 +273,28 @@ func (c *Client) GetRightHolder(identifier string) (RightHolder){
 		logrus.Errorf("header <<< %s", header)
 	}
 	// fmt.Printf("%s", body)
+	var response RightHolder
+	err = json.Unmarshal(body, &response)
+	return response
+}
+
+func (c *Client) ChangeRightHolderRate(identifier string, idRate int, dueDate string) (RightHolder){
+	const inputCtLayout = "2006-01-02"
+	var rightHolder RightHolder = c.GetRightHolder(identifier)
+	rightHolder.IdRate = idRate
+	var timeError error
+	rightHolder.DueDate.Time, timeError = time.Parse(inputCtLayout, dueDate)
+	if timeError != nil {
+		logrus.Errorf("timeError <<< %s", timeError)
+	}
+	//rightHolder.BirthDate = nil
+	//rightHolder.DueDate = nil
+	body, header, err := c.PutResource("/v1/rightholders/" + rightHolder.Identifier, rightHolder, true)
+	if err != nil {
+		logrus.Errorf("err <<< %s", err)
+		logrus.Errorf("body <<< %s", body)
+		logrus.Errorf("header <<< %s", header)
+	}
 	var response RightHolder
 	err = json.Unmarshal(body, &response)
 	return response

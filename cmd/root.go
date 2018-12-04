@@ -63,7 +63,8 @@ func init() {
 	rootCmd.PersistentFlags().StringP("password","p", "", "Crous API USER Password")
 	rootCmd.PersistentFlags().StringP("server","s", "", "Crous API url")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug","d", false, "Debug API Calls")
-
+	rootCmd.PersistentFlags().IntP("rate","r", 99, "IdRate 1,2 or 99")
+	rootCmd.PersistentFlags().StringP("dueDate","D", "2050-02-16", "dueDate 2050-02-16")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
@@ -100,5 +101,7 @@ func initConfig() {
 	viper.BindPFlag("api.auth.login", rootCmd.PersistentFlags().Lookup("user"))
 	viper.BindPFlag("api.auth.password", rootCmd.PersistentFlags().Lookup("password"))
 	viper.BindPFlag("api.url", rootCmd.PersistentFlags().Lookup("server"))
+	viper.BindPFlag("user.rate", rootCmd.PersistentFlags().Lookup("rate"))
+	viper.BindPFlag("user.dueDate", rootCmd.PersistentFlags().Lookup("dueDate"))
 }
 
