@@ -3,9 +3,10 @@ package crous
 import (
 	"github.com/spf13/viper"
 	"fmt"
+	"encoding/base64"
 	"net/http"
 	"strings"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"bytes"
 	"encoding/json"
@@ -141,7 +142,8 @@ func (c *Client) GetResource(resource string, authenticated bool) ([]byte, http.
 		return nil, nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/json;charset=utf-8")
+	req.Header.Set("User-Agent", "izlyctl")
 	if authenticated {
 		req.Header.Set("Authorization", c.token)
 	}
@@ -183,10 +185,52 @@ func (c *Client) PostResource(resource string, data interface{}, authenticated b
 		return nil, nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/json;charset=utf-8")
+	req.Header.Set("User-Agent", "izlyctl")
 	if authenticated {
 		req.Header.Set("Authorization", c.token)
 	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	header:= resp.Header
+	logrus.Debugf("headers <<< %s", header)
+	logrus.Debugf("body <<< %s", body)
+	if resp.StatusCode > 299 {
+		return nil, nil, fmt.Errorf("Status code: %d ", resp.StatusCode)
+	}
+
+	return body, header, err
+}
+
+func (c *Client) PostAuth(auth Auth) ([]byte, http.Header, error) {
+	var url string
+	var creds string
+	var form string
+
+	url = fmt.Sprintf("%s/v1/token", c.config.Api.Url)
+	logrus.Debugf(">>> POST  %q", url)
+
+	creds = fmt.Sprintf("%s:%s", auth.Login, auth.Password)
+	creds = base64.StdEncoding.EncodeToString([]byte(creds))
+	creds = fmt.Sprintf("Basic %s", creds)
+	logrus.Debugf(">>> Basic  %q", creds)
+
+	form = "grant_type=client_credentials&env=PRD"
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(form)))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req.Header.Set("Authorization", creds)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", "izlyctl")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -231,7 +275,8 @@ func (c *Client) PutResource(resource string, data interface{}, authenticated bo
 		return nil, nil, err
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/json;charset=utf-8")
+	req.Header.Set("User-Agent", "izlyctl")
 	if authenticated {
 		req.Header.Set("Authorization", c.token)
 	}
@@ -255,7 +300,7 @@ func (c *Client) PutResource(resource string, data interface{}, authenticated bo
 }
 
 func (c *Client) Authenticate() {
-	body, header, err := c.PostResource("/v1/authenticate",c.config.Api.Auth, false)
+	body, header, err := c.PostAuth(c.config.Api.Auth)
 	c.token = header.Get("Authorization")
 	logrus.Debugf("auth <<< %s", c.token)
 	if err != nil {
